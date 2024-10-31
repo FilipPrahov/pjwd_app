@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>Simple Warehouse System Example</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <style>
+    span {
+      display: inline-block;
+      width: 70px;
+      height: 70px;
+      margin: 6px;
+      background-color: #f9f9f9;
+    }
+
+    span-rounded {
+      display: inline-block;
+      width: 70px;
+      height: 70px;
+      margin: 6px;
+      background-color: #555;
+    }
+    </style>
+</head>
+
+<body>
+	<script>
+	//header for the inventory list table
+	const headerInvTable = '<table class="table table-bordered">' +
+				'<thead><tr><th>Ref</th><th>Type</th><th>Description</th><th>Barcode</th><th>Qty</th></tr></thead>' +
+				'<tbody>';
+				
+	//header for the new delivery receipt table
+	const headerNewDelReceipt = '<table class="table table-bordered">' +
+				'<thead><tr><th>Item</th><th>Quantity</th></tr></thead><tbody>';
+	
+	//new delivery receipt temp data structure
+	var newDelReceiptArray = [];
+	
+	//function to escape unsafe characters during http communication
+	function escapeHtml(unsafe) {
+		return String(unsafe)
+			.replace(/&/g, "&amp;")
+			.replace(/</g, "&lt;")
+			.replace(/>/g, "&gt;")
+			.replace(/"/g, "&quot;")
+			.replace(/'/g, "&#039;");
+	}
+	
+	//this function prepares the body of an HTML table from the parameter array
+	function makeTableHTML(myArray) {
+		var result = '';
+		var k;
+		for(var i=0; i<myArray.length; i++) {
+			result += "<tr>";
+			for(var j=0; j<myArray[i].length; j++){
+				k = escapeHtml((myArray[i][j]));
+				result += "<td>"+k+"</td>";
+			}
+			result += "</tr>";
+		}
+		result += "</tbody></table>";
+		
+		return result;
+	}
+	
+	//FE calls BE to get the inventory of a warehouse
+	function getInventory(whRef){
+		const getReq = new XMLHttpRequest();
+		getReq.open('GET', 'http://localhost:8080/inventory/'+whRef, true);
+		getReq.setRequestHeader('Content-type', 'application/x-www-form-urlencoded');
+		getReq.onload = () => {
+			// Request finished. Do processing here.
+			var inventoryArray = JSON.parse(getReq.responseText);
+			
+			var invTableHtml = headerInvTable + makeTableHTML(inventoryArray);
+			document.getElementById("inventoryList"+whRef).innerHTML = invTableHtml;
+		};
+
+		getReq.send(null);
+	}
+	
+	//FE calls BE to get total inventory of all warehouses in the company
+	function getTotalInventory(){
+		const getReq = new XMLHttpRequest();
+		getReq.open('GET', 'http://localhost:8080/inventory/totals', true);
+		getReq.setRequestHeader('Content-type', 'application/x-www-form-urlencoded');
+		getReq.onload = () => {
+			// Request finished. Do processing here.
+			var inventoryArray = JSON.parse(getReq.responseText);
+			
+			var invTableHtml = headerInvTable + makeTableHTML(inventoryArray);
+			document.getElementById("totalInventoryList").innerHTML = invTableHtml;
+		};
+
+		getReq.send(null);
+	}
+	
+	//Function to combine the header and body of the New Delivery Receipt table and display it on page
+	function displayDelRecTable(){
+		//combine particular header with the existing array
+		var delRecArray = headerNewDelReceipt + makeTableHTML(newDelReceiptArray);
+		//rebuild the table on the page
+		document.getElementById("newDelRecShipOrder").innerHTML = delRecArray;
+	}
+	
+	//This function adds the item and quantity to New Delivery Receipt table
+	function AddRecordToList(){
+		var itemRef = document.getElementById('itemRef').value;
+		//console.log(itemRef);
+		var itemQty = document.getElementById('itemQty').value;
+		//console.log(itemQty);
+		//represent new record in the delivery receipt as an array of ref and qty
+		var newRow = [itemRef, itemQty];
+		//push the new record into the existing array
+		newDelReceiptArray.push(newRow);
+		//display table
+		displayDelRecTable();
+	}
+	
+	//This function clears the Delivery Receipt modal
+	function ClearDelRecList(){
+		newDelReceiptArray = [];
+		//display table
+		displayDelRecTable();
+		document.getElementById('itemRef').value = null;
+		document.getElementById('itemQty').value = null;
+	}
+	
+	//Function to send the New Delivery Receipt to the BE. 
+	//The Warehouse id is taken from on-page attribute
+	function submitDelRec(){
+		var whRef = document.getElementById('delReceiptShipOrder').getAttribute('data-tab-value');
+		console.log(whRef);
+		var data = JSON.stringify(newDelReceiptArray);
+		const postReq = new XMLHttpRequest();
+		postReq.open('POST', 'http://localhost:8080/inventory/'+whRef+'/new-del-rec', true);
+		postReq.setRequestHeader('Content-type', 'application/x-www-form-urlencoded');
+		postReq.onload = () => {
+			 // do something to response
+			console.log(this.responseText);
+			//clear the modal
+			ClearDelRecList();
+		};
+
+		postReq.send(data);
+	}
+	
+	//Function to send the New Shipment Order to the BE.
+	//The Warehouse id is taken from on-page attribute	
+	function submitShipmentOrder(){
+		var whRef = document.getElementById('delReceiptShipOrder').getAttribute('data-tab-value');
+		console.log(whRef);
+		//Shipment Order is the same as Delivery Receipt except that the quantities 
+		//are removed instead of added to the warehouse.
+		//Turn quantities to negative
+		for (var rec of newDelReceiptArray){
+			rec[1] = Number(rec[1])*(-1);
+		}
+		var data = JSON.stringify(newDelReceiptArray);
+		const postReq = new XMLHttpRequest();
+		postReq.open('POST', 'http://localhost:8080/inventory/'+whRef+'/new-del-rec', true);
+		postReq.setRequestHeader('Content-type', 'application/x-www-form-urlencoded');
+		postReq.onload = () => {
+			 // do something to response
+			console.log(this.responseText);
+			//clear the modal
+			ClearDelRecList();
+		};
+
+		postReq.send(data);
+	}
+	
+	//when some tab is opened, set a "global" variable to be able to re-use some modals, functions, etc.
+	function openModal(tabValue) {
+		document.getElementById('delReceiptShipOrder').setAttribute('data-tab-value', tabValue);
+	}
+	
+	//sends information for the creation of new book item
+	function submitNewBook(){
+		var bookData = [];
+		<!--(description, barcode, author, title, isbn)-->
+		bookData.push(document.getElementById('description').value);
+		bookData.push(document.getElementById('barcode').value);
+		bookData.push(document.getElementById('author').value);
+		bookData.push(document.getElementById('title').value);
+		bookData.push(document.getElementById('isbn').value);
+		console.log(bookData);
+
+		var data = JSON.stringify(bookData);
+		const postReq = new XMLHttpRequest();
+		postReq.open('POST', 'http://localhost:8080/item-catalogue/new-book', true);
+		postReq.setRequestHeader('Content-type', 'application/x-www-form-urlencoded');
+		postReq.onload = () => {
+			 // do something to response
+			console.log(this.responseText);
+			//clear the modal
+			ClearNewBookForm();
+		};
+
+		postReq.send(data);
+	}
+	
+	//Function to clear New Book Form Modal
+	function ClearNewBookForm(){
+		document.getElementById('description').value = null;
+		document.getElementById('barcode').value = null;
+		document.getElementById('author').value = null;
+		document.getElementById('title').value = null;
+		document.getElementById('isbn').value = null;
+	}
+	
+	//sends information for the creation of new pencil set item
+	function submitNewPencilSet(){
+		var pencilSet = [];
+		<!--(psdescription, psbarcode, pcs, color, hardness)-->
+		pencilSet.push(document.getElementById('psdescription').value);
+		pencilSet.push(document.getElementById('psbarcode').value);
+		pencilSet.push(document.getElementById('pcs').value);
+		pencilSet.push(document.getElementById('color').value);
+		pencilSet.push(document.getElementById('hardness').value);
+		console.log(pencilSet);
+
+		var data = JSON.stringify(pencilSet);
+		const postReq = new XMLHttpRequest();
+		postReq.open('POST', 'http://localhost:8080/item-catalogue/new-pencil-set', true);
+		postReq.setRequestHeader('Content-type', 'application/x-www-form-urlencoded');
+		postReq.onload = () => {
+			 // do something to response
+			console.log(this.responseText);
+			//clear the modal
+			ClearNewPencilSetForm();
+		};
+
+		postReq.send(data);
+	}
+	
+	//Function to clear New Pencil Set Form Modal
+	function ClearNewPencilSetForm(){
+		document.getElementById('psdescription').value = null;
+		document.getElementById('psbarcode').value = null;
+		document.getElementById('pcs').value = null;
+		document.getElementById('color').value = null;
+		document.getElementById('hardness').value = null;
+	}
+	
+	
+	//sends information for the creation of new notebook item
+	function submitNewNotebook(){
+		var notebook = [];
+		<!--(nbdescription, nbbarcode, hasSpiral, nbSheets, nbhardcover)-->
+		notebook.push(document.getElementById('nbdescription').value);
+		notebook.push(document.getElementById('nbbarcode').value);
+		//push yes/no for boolean values
+		if (document.getElementById('hasSpiral').value == 'on'){
+			notebook.push('yes');
+		} else {
+			notebook.push('no');
+		};
+		notebook.push(document.getElementById('nbSheets').value);
+		//push yes/no for boolean values
+		if (document.getElementById('nbhardcover').value == 'on'){
+			notebook.push('yes');
+		} else {
+			notebook.push('no');
+		};
+		console.log(notebook);
+
+		var data = JSON.stringify(notebook);
+		const postReq = new XMLHttpRequest();
+		postReq.open('POST', 'http://localhost:8080/item-catalogue/new-notebook', true);
+		postReq.setRequestHeader('Content-type', 'application/x-www-form-urlencoded');
+		postReq.onload = () => {
+			 // do something to response
+			console.log(this.responseText);
+			//clear the modal
+			ClearNewNotebookForm();
+		};
+
+		postReq.send(data);
+	}
+	
+	//Function to clear New Notebook Form Modal
+	function ClearNewNotebookForm(){
+		document.getElementById('nbdescription').value = null;
+		document.getElementById('nbbarcode').value = null;
+		document.getElementById('hasSpiral').value = null;
+		document.getElementById('nbSheets').value = null;
+		document.getElementById('nbhardcover').value = null;
+	}
+
+</script>
+
+<div class="container mt-3">
+	<p class="text-danger">
+
+		<!-- Nav tabs -->
+		<ul class="nav nav-tabs" role="tablist">
+			<li class="nav-item">
+				<a class="nav-link active" data-bs-toggle="tab" href="#home">WH Manager 1</a>
+			</li>
+			<li class="nav-item">
+				<a class="nav-link" data-bs-toggle="tab" href="#menu1">WH Manager 2</a>
+			</li>
+			<li class="nav-item">
+				<a class="nav-link" data-bs-toggle="tab" href="#menu2">HQ Accountant</a>
+			</li>
+		</ul>
+		
+		<!-- Tab panes -->
+			<!-- The Delivery Receipt/Shipment Order Modal -->
+				<!--This modal is supposed to be common for both WH tabs-->
+				<div class="modal" id="delReceiptShipOrder" data-tab-value="">
+					<div class="modal-dialog modal-dialog-centered modal-fullscreen-md-down"> <!--sm/md/lg/xl/xxl-->
+						<div class="modal-content">
+							
+			
+							<!-- Modal Header -->
+							<div class="modal-header">
+								<h4 class="modal-title">Delivery Receipt/Shipment Order</h4>
+							</div>
+				
+							<!-- Modal body -->
+							<div class="modal-body">
+								<div class="container mt-3">
+									<form>
+										<div contenteditable>
+											<div class="row">
+												<div class="col">
+													<label for="itemRef" class="form-label">Item Ref*:</label>
+														<input type="text" class="form-control" id="itemRef" placeholder="Item Ref" name="itemRef" required>
+															<div class="valid-feedback">Valid.</div>
+															<div class="invalid-feedback">Please fill in this field.</div>
+												</div>
+												<div class="col">
+													<label for="itemQty" class="form-label">Item Quantity*:</label>
+													<input type="text" class="form-control" id="itemQty" placeholder="Item Quantity" name="itemQty" required>
+													<div class="valid-feedback">Valid.</div>
+													<div class="invalid-feedback">Please fill in this field.</div>
+												</div>
+												<br>
+												<br>
+												<br>
+												<br>
+												<button type="button" onClick="AddRecordToList()" class="btn btn-primary mt-3" >Add</button>
+											</div>
+										</div>
+									</form>
+								</div>
+								<div class="container mt-3">
+									<p id="newDelRecShipOrder"></p>
+								</div>
+								<button type="button" onClick="ClearDelRecList()" class="btn btn-primary">Clear List</button>
+							</div>
+							
+							<!-- Modal footer -->
+							<div class="modal-footer">
+								<button type="submit" onClick="submitDelRec()" class="btn btn-primary">Submit Delivery Receipt</button>
+								<button type="submit" onClick="submitShipmentOrder()" class="btn btn-primary">Submit Shipment Order</button>
+								<button type="button" class="btn btn-danger" data-bs-dismiss="modal">Close</button>
+							</div>
+						</div>
+					</div>
+				</div>
+				
+				
+				
+				
+				
+			<!-- The Create New Book Item Card Modal -->
+				<div class="modal" id="newBookItemCard" data-tab-value="">
+					<div class="modal-dialog modal-dialog-centered modal-fullscreen-md-down"> <!--sm/md/lg/xl/xxl-->
+						<div class="modal-content">
+						
+							<!-- Modal Header -->
+							<div class="modal-header">
+								<h4 class="modal-title">New Book Item Card</h4>
+							</div>
+							
+							<!-- Modal body -->
+							<div class="modal-body">
+								<div class="container mt-3">
+									<form>
+											<!--(description, barcode, author, title, isbn)-->
+										<label for="description" class="form-label">Book description*:</label>
+											<input type="text" class="form-control" id="description" placeholder="description" name="description" required>
+												<div class="valid-feedback">Valid.</div>
+												<div class="invalid-feedback">Please fill in this field.</div>
+										<label for="barcode" class="form-label">Barcode*:</label>
+											<input type="text" class="form-control" id="barcode" placeholder="Barcode" name="barcode" required>
+												<div class="valid-feedback">Valid.</div>
+												<div class="invalid-feedback">Please fill in this field.</div>
+										<label for="author" class="form-label">Author*:</label>
+											<input type="text" class="form-control" id="author" placeholder="Author" name="author" required>
+												<div class="valid-feedback">Valid.</div>
+												<div class="invalid-feedback">Please fill in this field.</div>
+										<label for="title" class="form-label">Title*:</label>
+											<input type="text" class="form-control" id="title" placeholder="Title" name="title" required>
+												<div class="valid-feedback">Valid.</div>
+												<div class="invalid-feedback">Please fill in this field.</div>
+										<label for="isbn" class="form-label">ISBN*:</label>
+											<input type="text" class="form-control" id="isbn" placeholder="ISBN" name="isbn" required>
+												<div class="valid-feedback">Valid.</div>
+												<div class="invalid-feedback">Please fill in this field.</div>
+										<br>
+									</form>
+								</div>
+							</div>
+							
+							<!-- Modal footer -->
+							<div class="modal-footer">
+								<button type="submit" onClick="submitNewBook()" class="btn btn-primary">Submit New Book</button>
+								<button type="button" class="btn btn-danger" data-bs-dismiss="modal">Close</button>
+							</div>
+						</div>
+					</div>
+				</div>
+
+
+
+
+			<!-- The Create New Pencil Set Item Card Modal -->
+				<div class="modal" id="newPencilSetItemCard" data-tab-value="">
+					<div class="modal-dialog modal-dialog-centered modal-fullscreen-md-down"> <!--sm/md/lg/xl/xxl-->
+						<div class="modal-content">
+						
+							<!-- Modal Header -->
+							<div class="modal-header">
+								<h4 class="modal-title">New Pencil Set Item Card</h4>
+							</div>
+							
+							<!-- Modal body -->
+							<div class="modal-body">
+								<div class="container mt-3">
+									<form>
+											<!--(psdescription, psbarcode, pcs, color, hardness)-->
+										<label for="psdescription" class="form-label">PencilSet description*:</label>
+											<input type="text" class="form-control" id="psdescription" placeholder="pencilSet description" name="ps description" required>
+												<div class="valid-feedback">Valid.</div>
+												<div class="invalid-feedback">Please fill in this field.</div>
+										<label for="psbarcode" class="form-label">PencilSet Barcode*:</label>
+											<input type="text" class="form-control" id="psbarcode" placeholder="PencilSet Barcode" name="ps barcode" required>
+												<div class="valid-feedback">Valid.</div>
+												<div class="invalid-feedback">Please fill in this field.</div>
+										<label for="pcs" class="form-label">Pieces*:</label>
+											<input type="number" class="form-control" id="pcs" placeholder="Pieces" name="pieces" required>
+												<div class="valid-feedback">Valid.</div>
+												<div class="invalid-feedback">Please fill in this field.</div>
+										<label for="color" class="form-label">Color*:</label>
+											<input type="text" class="form-control" id="color" placeholder="color" name="color" required>
+												<div class="valid-feedback">Valid.</div>
+												<div class="invalid-feedback">Please fill in this field.</div>
+										<label for="hardness" class="form-label">hardness*:</label>
+											<input type="text" class="form-control" id="hardness" placeholder="hardness" name="hardness" required>
+												<div class="valid-feedback">Valid.</div>
+												<div class="invalid-feedback">Please fill in this field.</div>
+										<br>
+									</form>
+								</div>
+							</div>
+							
+							<!-- Modal footer -->
+							<div class="modal-footer">
+								<button type="submit" onClick="submitNewPencilSet()" class="btn btn-primary">Submit New PencilSet</button>
+								<button type="button" class="btn btn-danger" data-bs-dismiss="modal">Close</button>
+							</div>
+						</div>
+					</div>
+				</div>
+
+
+
+
+
+			<!-- The Create New Notebook Item Card Modal -->
+				<div class="modal" id="newNotebookItemCard" data-tab-value="">
+					<div class="modal-dialog modal-dialog-centered modal-fullscreen-md-down"> <!--sm/md/lg/xl/xxl-->
+						<div class="modal-content">
+						
+							<!-- Modal Header -->
+							<div class="modal-header">
+								<h4 class="modal-title">New Notebook Item Card</h4>
+							</div>
+							
+							<!-- Modal body -->
+							<div class="modal-body">
+								<div class="container mt-3">
+									<form>
+											<!--(nbdescription, nbbarcode, hasSpiral, nbSheets, nbhardcover)-->
+										<label for="nbdescription" class="form-label">Notebook description*:</label>
+											<input type="text" class="form-control" id="nbdescription" placeholder="nbdescription" name="nbdescription" required>
+												<div class="valid-feedback">Valid.</div>
+												<div class="invalid-feedback">Please fill in this field.</div>
+										<label for="nbbarcode" class="form-label">Notebook Barcode*:</label>
+											<input type="text" class="form-control" id="nbbarcode" placeholder="Notebook Barcode" name="nbbarcode" required>
+												<div class="valid-feedback">Valid.</div>
+												<div class="invalid-feedback">Please fill in this field.</div>
+										<label for="hasSpiral" class="form-label">Has spiral?*:</label>
+											<input type="checkbox" class="form-check-input" id="hasSpiral" placeholder="hasSpiral" name="hasSpiral">
+												<div class="valid-feedback">Valid.</div>
+												<div class="invalid-feedback">Please fill in this field.</div>
+										<label for="nbSheets" class="form-label">Number of sheets*:</label>
+											<input type="number" class="form-control" id="nbSheets" placeholder="nbSheets" name="nbSheets" required>
+												<div class="valid-feedback">Valid.</div>
+												<div class="invalid-feedback">Please fill in this field.</div>
+										<label for="nbhardcover" class="form-label">nbhardcover*:</label>
+											<input type="checkbox" class="form-check-input" id="nbhardcover" placeholder="nbhardcover" name="nbhardcover">
+												<div class="valid-feedback">Valid.</div>
+												<div class="invalid-feedback">Please fill in this field.</div>
+										<br>
+									</form>
+								</div>
+							</div>
+							
+							<!-- Modal footer -->
+							<div class="modal-footer">
+								<button type="submit" onClick="submitNewNotebook()" class="btn btn-primary">Submit New Notebook</button>
+								<button type="button" class="btn btn-danger" data-bs-dismiss="modal">Close</button>
+							</div>
+						</div>
+					</div>
+				</div>
+
+<!-------------Tabs start here ---------------------------------------->
+		<div class="tab-content">
+<!----------------------Warehouse 1 Manager---------------------------->
+			<div id="home" class="container tab-pane active" onclick="openModal('wh1')"><br>
+				<div class="container-fluid p-5 my-5 bg-dark grey text-white">
+					<h1>Warehouse Manager Options</h1>
+				</div>
+
+				<h2>Display list of items and quantities in warehouse 1</h2>
+				<div class="container mt-3">
+					<button type="button" class="btn btn-success" onClick="getInventory('wh1')" data-bs-toggle="collapse" data-bs-target="#demo">Inventory List WH1</button>
+					<div id="demo" class="collapse">
+						<p id="inventoryListwh1"></p>
+					</div>
+				</div>
+  
+				<div class="container mt-3">
+				<h2>Create Delivery Receipt/Shipment Order Document in warehouse 1</h2>
+					<button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#delReceiptShipOrder">
+						New Delivery Receipt/Shipment Order
+					</button>
+				</div>
+			
+			</div>
+			
+			
+<!----------------------Warehouse 2 Manager---------------------------->
+			<div id="menu1" class="container tab-pane fade" onclick="openModal('wh2')"><br>
+				<div class="container-fluid p-5 my-5 bg-dark grey text-white">
+					<h1>Warehouse Manager Options</h1>
+				</div>
+
+				<h2>Display list of items and quantities in warehouse 2</h2>
+				<div class="container mt-3">
+					<button type="button" class="btn btn-success" onClick="getInventory('wh2')" data-bs-toggle="collapse" data-bs-target="#demo">Inventory List WH2</button>
+					<div id="demo" class="collapse">
+						<p id="inventoryListwh2"></p>
+					</div>
+				</div>
+				
+				<div class="container mt-3">
+					<h2>Create Delivery Receipt/Shipment Order Document in warehouse 2</h2>
+						<button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#delReceiptShipOrder">
+							New Delivery Receipt/Shipment Order
+						</button>
+				</div>
+				
+			</div>
+			
+<!----------------------HeadQuarters Accountant------------------------>
+			<div id="menu2" class="container tab-pane fade"><br>
+				<div class="container-fluid p-5 my-5 bg-dark grey text-white">
+					<h1>HQ Accountant Options</h1>
+				</div>
+				
+				<h2>Display total inventory</h2>
+				<div class="container mt-3">
+					<button type="button" class="btn btn-success" onClick="getTotalInventory()" data-bs-toggle="collapse" data-bs-target="#demo">Total Inventory List</button>
+					<div id="demo" class="collapse">
+						<p id="totalInventoryList"></p>
+					</div>
+				</div>
+				
+				<div class="container mt-3">
+					<h2>Create New Item Card</h2>
+						<button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#newBookItemCard">
+							New Book Item Card
+						</button>
+						<button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#newPencilSetItemCard">
+							New Pencil Set Item Card
+						</button>
+						<button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#newNotebookItemCard">
+							New Notebook Item Card
+						</button>
+				</div>
+				
+			</div>
+<!---------------------------------------------------------------------->
+		</div>
+
+	</p>
+</div>
+</body>
+</html> 
