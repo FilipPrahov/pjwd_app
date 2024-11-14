@@ -112,12 +112,20 @@
 		//console.log(itemRef);
 		var itemQty = document.getElementById('itemQty').value;
 		//console.log(itemQty);
-		//represent new record in the delivery receipt as an array of ref and qty
-		var newRow = [itemRef, itemQty];
-		//push the new record into the existing array
-		newDelReceiptArray.push(newRow);
-		//display table
-		displayDelRecTable();
+		if (!itemRef || !itemQty){
+			alert("Please, fill in item ref and quantity");
+			return;
+		} else if (itemQty <= 1) {
+			alert("Please, enter positive quantity");
+			return;
+		} else {
+			//represent new record in the delivery receipt as an array of ref and qty
+			var newRow = [itemRef, itemQty];
+			//push the new record into the existing array
+			newDelReceiptArray.push(newRow);
+			//display table
+			displayDelRecTable();
+		}
 	}
 	
 	//This function clears the Delivery Receipt modal
