@@ -6,10 +6,16 @@ visit https://nodejs.org/en and download the latest version by following the ins
 Make sure node is added to your path.
 
 Place files item.js, warehouse.js, itemCatalogue.txt, and warehouse.txt in one folder.
-File Tabs.html can be placed in any folder on the same machine.
+Files Tabs.html and tabs_functions.js can be placed in any folder on the same machine,
+but both must be in the same folder.
 The server is implemented in warehouse.js, and it listens on localhost, port 8080.
 The client is implemented in Tabs.html
 
+## Initialization ##
+
+If you want to initialize new company with 2 empty warehouses, then delete files
+itemCatalogue.txt, and warehouse.txt. Start the server and the application, create 
+manually the items, and add quantities via the functions in the application.
 
 ## Start the server ##
 

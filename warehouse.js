@@ -79,7 +79,8 @@ class Company {
 		console.log("Reading data from itemCatalogue.txt: ");
 		fs.readFile('itemCatalogue.txt', 'utf8', (err, data) => {
 			if (err) {
-				console.error(err);
+				//itemCatalogue.txt does not exist - new item catalogue to be created
+				console.log("itemCatalogue.txt does not exist - new item catalogue to be created");
 				return;
 			}
 			
@@ -112,7 +113,16 @@ class Company {
 		console.log("Reading data from warehouse.txt: ");
 		fs.readFile('warehouse.txt', 'utf8', (err, data) => {
 			if (err) {
+				//'warehouse.txt' is not found - that is, company initialization
 				console.error(err);
+				// Create warehouses
+				var warehouse1 = new Warehouse("Warehouse1");
+				var warehouse2 = new Warehouse("Warehouse2");
+				
+				//Add warehouses to the Company
+				this.addWarehouse(warehouse1);
+				this.addWarehouse(warehouse2);
+				
 				return;
 			}
 			//make sure tempArray is empty before we start using it
@@ -371,7 +381,7 @@ function TestProgram() {
 
 
 
-function TestProgram2(){
+function StartServer(){
 	// Create company
 	var myCompany = new Company();
 	
@@ -604,4 +614,4 @@ function TestProgram2(){
 }
 
 //TestProgram();
-TestProgram2();
+StartServer();
