@@ -1,1 +1,0 @@
-[{"warehouseName":"Warehouse1","itemList":{"1":23,"2":43,"3":78}},{"warehouseName":"Warehouse2","itemList":{"1":32,"2":84,"3":15}}]
